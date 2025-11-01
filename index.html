@@ -1,66 +1,113 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Detección de Razas de Perros</title>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-<style>
-body { font-family: Arial; text-align: center; margin: 40px; }
-#preview { width: 200px; height: 200px; object-fit: cover; border: 1px solid #ccc; margin-top: 10px; }
-#resultado { font-size: 1.5rem; margin-top: 20px; font-weight: bold; }
-</style>
-</head>
-<body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Detector de Razas de Perros 🐶</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<h1>Clasificador de Razas de Perros 🐕</h1>
-<p>Sube una foto de un perro y el modelo intentará adivinar la raza</p>
+    <style>
+      body {
+        background: #f8f9fa;
+      }
+      #preview {
+        max-width: 300px;
+        border-radius: 10px;
+        margin-top: 20px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      }
+      #resultado {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #333;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body class="text-center p-4">
 
-<input type="file" id="file-input" accept="image/*" onchange="cargarImagen(event)">
-<br>
-<img id="preview" src="" alt="Previsualización">
-<div id="resultado">Esperando imagen...</div>
+    <div class="container">
+      <h1 class="fw-bold mb-3">Detector de Razas de Perros 🐾</h1>
+      <p class="lead">Sube una imagen de un perro y el modelo intentará adivinar su raza</p>
 
-<script>
-let modelo = null;
-let nombresClases = [
-  "Abyssinian", "American_bulldog", "Beagle", "Boxer", "Chihuahua",
-  "German_shepherd", "Golden_retriever", "Pitbull", "Rottweiler"
-  // ← Aquí pones las clases que usaste en tu modelo
-];
+      <div class="mb-3">
+        <input type="file" id="fileInput" accept="image/*" class="form-control w-50 mx-auto">
+      </div>
 
-async function cargarModelo() {
-  document.getElementById('resultado').innerText = "Cargando modelo...";
-  modelo = await tf.loadLayersModel("model.json");
-  document.getElementById('resultado').innerText = "Modelo cargado. Sube una imagen.";
-  console.log("Modelo cargado.");
-}
-cargarModelo();
+      <div>
+        <img id="preview" src="#" alt="Vista previa" style="display:none;">
+      </div>
 
-function cargarImagen(event) {
-  const imgElement = document.getElementById('preview');
-  imgElement.src = URL.createObjectURL(event.target.files[0]);
-  imgElement.onload = predecir;
-}
+      <div id="resultado"></div>
+    </div>
 
-async function predecir() {
-  if (!modelo) return;
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <script>
+      let modelo;
 
-  let img = document.getElementById('preview');
-  let tensor = tf.browser.fromPixels(img)
-                .resizeNearestNeighbor([160,160])
-                .toFloat()
-                .div(255.0)
-                .expandDims();
+      // 1️⃣ Cargar el modelo
+      (async () => {
+        document.getElementById("resultado").innerHTML = "Cargando modelo...";
+        modelo = await tf.loadLayersModel("model.json");
+        document.getElementById("resultado").innerHTML = "Modelo cargado ✅";
+      })();
 
-  let prediccion = modelo.predict(tensor);
-  let valores = await prediccion.data();
-  let indice = valores.indexOf(Math.max(...valores));
+      // 2️⃣ Detectar imagen cargada
+      const input = document.getElementById("fileInput");
+      const preview = document.getElementById("preview");
+      input.addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
 
-  document.getElementById('resultado').innerText =
-    "Predicción: " + nombresClases[indice];
-}
-</script>
+        // Mostrar imagen
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          preview.src = e.target.result;
+          preview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
 
-</body>
+        // Esperar a que se muestre la imagen antes de predecir
+        setTimeout(() => predecir(file), 300);
+      });
+
+      // 3️⃣ Predecir raza
+      async function predecir(file) {
+        if (!modelo) {
+          alert("Modelo no cargado aún 😅");
+          return;
+        }
+
+        // Crear imagen temporal
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+        await new Promise((r) => (img.onload = r));
+
+        // Convertir a tensor
+        const tensor = tf.browser
+          .fromPixels(img)
+          .resizeNearestNeighbor([224, 224]) // tamaño estándar del modelo
+          .toFloat()
+          .div(255.0)
+          .expandDims();
+
+        // Predicción
+        const pred = modelo.predict(tensor);
+        const data = await pred.data();
+        const indice = data.indexOf(Math.max(...data));
+
+        // Raza según índice (según dataset Oxford-IIIT Pet)
+        const razas = [
+          "Abyssinian", "american_bulldog", "american_pit_bull_terrier", "basset_hound", "beagle", "Bengal", "Birman", "Bombay", "boxer",
+          "British_Shorthair", "chihuahua", "Egyptian_Mau", "english_cocker_spaniel", "english_setter", "german_shorthaired", "great_pyrenees",
+          "havanese", "japanese_chin", "keeshond", "leonberger", "Maine_Coon", "miniature_pinscher", "newfoundland", "Persian", "pomeranian",
+          "pug", "Ragdoll", "Russian_Blue", "saint_bernard", "samoyed", "scottish_terrier", "shiba_inu", "Siamese", "Sphynx", "staffordshire_bull_terrier",
+          "wheaten_terrier", "yorkshire_terrier"
+        ];
+
+        const raza = razas[indice] || "Desconocida 🤔";
+        document.getElementById("resultado").innerHTML = `Predicción: <b>${raza}</b>`;
+      }
+    </script>
+  </body>
 </html>
